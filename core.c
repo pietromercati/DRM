@@ -25,7 +25,6 @@
  *  2007-11-29  RT balancing improvements by Steven Rostedt, Gregory Haskins,
  *              Thomas Gleixner, Mike Kravetz
  */
-
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/nmi.h>
@@ -90,13 +89,24 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+
 // Pietro
 // Macros definitions
 #define MONITOR_ON
 //end of Macros definitions
 
 
-
+// Variables definitions
+#ifdef MONITOR_ON
+DEFINE_PER_CPU(struct monitor_stats_data *, monitor_stats_data);
+EXPORT_PER_CPU_SYMBOL(monitor_stats_data);
+DEFINE_PER_CPU(struct monitor_stats_data *, monitor_stats_data2);
+EXPORT_PER_CPU_SYMBOL(monitor_stats_data2);
+DEFINE_PER_CPU(int ,  monitor_stats_index);
+EXPORT_PER_CPU_SYMBOL(monitor_stats_index);
+DEFINE_PER_CPU(int , monitor_stats_start);
+EXPORT_PER_CPU_SYMBOL(monitor_stats_start);
+#endif
 
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
