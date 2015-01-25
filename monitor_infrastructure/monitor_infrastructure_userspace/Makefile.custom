@@ -66,7 +66,7 @@ all: monitor_userspace
 .c.o:
 	$(CC) $(CFLAGS) -c $<
 
-reliability_stats_userspace: ${OBJS}
+monitor_userspace: ${OBJS}
 	$(CC) -o $(EXEC_NAME) ${OBJS} $(LDFLAGS)
 
 install: monitor_userspace
