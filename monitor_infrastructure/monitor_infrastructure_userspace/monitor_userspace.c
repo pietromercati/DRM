@@ -32,8 +32,6 @@
 
 */
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -41,7 +39,6 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-
 #include <sched.h>
 #include <unistd.h>
 #include <string.h>
@@ -49,18 +46,129 @@
 #include <pthread.h>
 #include <sys/wait.h> //for wait()
 
+#define DEBUG // enables printf for debugging
+#define NUM_CPU 8 // number of cpu of the target platform
+#define SLEEP_TIME 1
 
-/*
-define the length of the buffer to export data
-the length must be the same of the one defined in monitor_infrastructure_driver.
-*/
+// Pietro : the following needs to be the same as in monitor_infrastructure_driver.c
+#define MONITOR_EXPORT_PAGE 6   	// Number of pages allocated for each buffer
+#define MONITOR_EXPORT_LENGTH 1024      // Number of enries of kind "monitor_stats_data" inside the allocated buffer
+// Macros for ioctl
+#define SELECT_CPU 1
+#define READY 2
+
+struct monitor_stats_data {
+                unsigned int cpu;
+                unsigned long int j; 	//jiffies
+                unsigned long int cycles;
+                unsigned long int instructions;
+};
 
 // ---------------- MAIN FUNCTION ----------------- //
 
-int main(){
-	printf("\n\nHello World !!\n\n");
+int main(int argc, char ** argv){
+
+	int fd;	
+	int cpu;	
+	char *log;
+	int ready[NUM_CPU];
+	int ready_old[NUM_CPU];
+	int len;
+	struct monitor_stats_data *log_struct;
+	char buf[3];
+	char file_name[50];
+	FILE *fp;
+	int i;
+
+	#ifdef DEBUG
+	printf("\n\nStarting Serial Reading\n\n");
+	#endif // DEBUG
+
+	// open monitor driver
+	fd = open("/dev/monitor",O_RDWR);
+	if( fd == -1) {
+                printf("Monitor driver open error...\n");
+                exit(0);
+        }
+
+	// save the current status of ready flags	
+	for (cpu = 0 ; cpu < NUM_CPU ; cpu++){
+		ioctl(fd, READY, &ready[cpu]);
+		ready_old[cpu] = ready[cpu]; 
+	}
+		
+	// Main Loop
+	while(1){
+		
+		// sleep to reduce overhead	
+		sleep(SLEEP_TIME);			
+
+		// check each cpu
+		for (cpu = 0 ; cpu < NUM_CPU ; ){
+			
+			// select cpu and get the ready flag
+			ioctl(fd, SELECT_CPU, &cpu);
+			ioctl(fd, READY, &ready[cpu]);
+
+			if ( (ready[cpu] == ready_old[cpu])  &&   (ready[cpu] != 0) ){ // in case these two are verified, then the buffer is not ready
+				#ifdef DEBUG
+                        	printf("CPU %u Not ready yet...\n", cpu);
+                        	printf("READY = %u\n", ready[cpu]);
+				#endif // DEBUG
+                	} else { // if enters this else, it means the buffer for that cpu is ready
+
+				// allocate log buffer
+				log = malloc (sizeof(struct monitor_stats_data)*MONITOR_EXPORT_LENGTH);
+
+				// read the buffer and store into log
+				len = read(fd , log , MONITOR_EXPORT_LENGTH);
+				
+				// verify correct reading
+		                if (len == -1){
+                		        printf("Error while reading buffer...\n");
+                        		exit(1);
+                		}
+
+				// writing log data to file
+				#ifdef DEBUG
+				printf("Start writing data on file !! \n");
+				#endif
+				// re-initialize log struct
+                		log_struct = (struct monitor_stats_data *)log;
+
+				// open file
+				sprintf(buf,"%d",cpu);
+				strcpy(file_name,"/data/PIETRO/monitor_stats_data_cpu_");
+				strcat(file_name,buf);
+				fp = fopen(file_name,"a");
+				
+				// write data to file in the right format
+				for(i = MONITOR_EXPORT_LENGTH-1 ; i>=0 ; i--){
+                        		fprintf(
+						fp,
+                                        	"%lu\t%lu\t%lu\t%lu\n",
+                                                log_struct[i].cpu,
+                                                log_struct[i].j,
+                                                log_struct[i].cycles,
+                                                log_struct[i].instructions
+						);
+				}
+				
+				// close file
+				fclose(fp);				
+
+				// update ready_old
+		                ready_old[cpu] = ready[cpu];
+
+				// free log buffer
+				free(log);
+
+			} // end of reading
+		} // end of for cpu
+	} // end of Main loop
+
 	return 0;
-}
+} 
 
 
 
