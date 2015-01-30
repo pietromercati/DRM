@@ -1,4 +1,4 @@
-
+  
 // --------------- MONITOR INFRASTRUCTURE - USERSPACE DAEMON -----------------
 /*
  * 
@@ -54,8 +54,9 @@
 #define MONITOR_EXPORT_PAGE 6   	// Number of pages allocated for each buffer
 #define MONITOR_EXPORT_LENGTH 1024      // Number of enries of kind "monitor_stats_data" inside the allocated buffer
 // Macros for ioctl
-#define SELECT_CPU 1
-#define READY 2
+#define SELECT_CPU 	1
+#define READY 		2
+#define S_READY		3
 
 struct monitor_stats_data {
                 unsigned int cpu;
@@ -76,9 +77,13 @@ int main(int argc, char ** argv){
 	int len;
 	struct monitor_stats_data *log_struct;
 	char buf[3];
-	char file_name[50];
+	char file_name[60];
 	FILE *fp;
 	int i;
+
+	// remove previous files (this is required as files are opened with the append option)
+	system("rm /data/PIETRO/MONITOR_STATS/monitor_stats_data_cpu_*");
+
 
 	#ifdef DEBUG
 	printf("\n\nStarting Serial Reading\n\n");
@@ -104,11 +109,11 @@ int main(int argc, char ** argv){
 		sleep(SLEEP_TIME);			
 
 		// check each cpu
-		for (cpu = 0 ; cpu < NUM_CPU ; ){
+		for (cpu = 0 ; cpu < NUM_CPU ; cpu++){
 			
 			// select cpu and get the ready flag
 			ioctl(fd, SELECT_CPU, &cpu);
-			ioctl(fd, READY, &ready[cpu]);
+			ioctl(fd, S_READY, &ready[cpu]);
 
 			if ( (ready[cpu] == ready_old[cpu])  &&   (ready[cpu] != 0) ){ // in case these two are verified, then the buffer is not ready
 				#ifdef DEBUG
@@ -138,7 +143,7 @@ int main(int argc, char ** argv){
 
 				// open file
 				sprintf(buf,"%d",cpu);
-				strcpy(file_name,"/data/PIETRO/monitor_stats_data_cpu_");
+				strcpy(file_name,"/data/PIETRO/MONITOR_STATS/monitor_stats_data_cpu_");
 				strcat(file_name,buf);
 				fp = fopen(file_name,"a");
 				

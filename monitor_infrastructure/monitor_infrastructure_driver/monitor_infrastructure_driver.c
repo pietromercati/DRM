@@ -47,13 +47,12 @@
 #include <linux/cdev.h>
 #include <linux/device.h>  //for class_create
 
-
 #define MONITOR_MAJOR 32
 #define MONITOR_NAME "monitor"
 
-#define SELECT_CPU 0
-#define READY 1
-#define S_READY 2
+#define SELECT_CPU 	1
+#define READY 		2
+#define S_READY 	3
 
 /*
 *	Defines the dimention of the buffer to allocate for collecting the MONITOR statistics. 	
@@ -171,6 +170,8 @@ static long monitor_ioctl(struct file *file,
 	long retval = 0;
 
 	switch ( cmd ) {
+		/* Pietro : the value of seleceted_cpu should be passed from userspace and determined the location
+			of all variables which are defined per cpu */
 		case SELECT_CPU:
 			if ( copy_from_user( &selected_cpu, (int *)arg, sizeof(selected_cpu) )) {
 							

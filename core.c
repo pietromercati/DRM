@@ -24,39 +24,7 @@
  *  2007-07-01  Group scheduling enhancements by Srivatsa Vaddagiri
  *  2007-11-29  RT balancing improvements by Steven Rostedt, Gregory Haskins,
  *              Thomas Gleixner, Mike Kravetz
- *  2015-01-25  Modified by Andrea Bartolini and Pietro Mercati to be 
- * 		integrated in the Dynamic Reliability Management framework
- *
- *
- * 		Modified by : Andrea Bartolini and Pietro Mercati
- * 		email : pimercat@eng.ucsd.edu
- * 
- * 		If using this code for research purposes, include 
- * 		references to the following publications
- * 
- * 		1) P.Mercati, A. Bartolini, F. Paterna, T. Rosing and L. Benini; A Linux-governor based 
- *    		Dynamic Reliability Manager for android mobile devices. DATE 2014.
- * 		2) P.Mercati, A. Bartolini, F. Paterna, L. Benini and T. Rosing; An On-line Reliability 
- *    		Emulation Framework. EUC 2014
- * 
-
-	This file is part of DRM.
-    	DRM is free software: you can redistribute it and/or modify
-    	it under the terms of the GNU General Public License as published by
-    	the Free Software Foundation, either version 3 of the License, or
-    	(at your option) any later version.
-
-    	DRM is distributed in the hope that it will be useful,
-    	but WITHOUT ANY WARRANTY; without even the implied warranty of
-    	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    	GNU General Public License for more details.
-
-    	You should have received a copy of the GNU General Public License
-    	along with DRM.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-
-
+ */
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/nmi.h>
@@ -122,23 +90,36 @@
 #include <trace/events/sched.h>
 
 
-// Pietro
+// Pietro -----------------------------------
 // Macros definitions
 #define MONITOR_ON
+#define MONITOR_EXPORT_LENGTH 1024 //Number of enries of kind "monitor_stats_data" inside the allocated buffer. It has to be same as in the driver and in the userspace program
+#define DEBUG_ON
 //end of Macros definitions
 
 
 // Variables definitions
 #ifdef MONITOR_ON
+struct monitor_stats_data {
+                unsigned int cpu;
+                unsigned long int j; //jiffies
+                unsigned long int cycles;
+                unsigned long int instructions;
+};
+
 DEFINE_PER_CPU(struct monitor_stats_data *, monitor_stats_data);
 EXPORT_PER_CPU_SYMBOL(monitor_stats_data);
 DEFINE_PER_CPU(struct monitor_stats_data *, monitor_stats_data2);
 EXPORT_PER_CPU_SYMBOL(monitor_stats_data2);
-DEFINE_PER_CPU(int ,  monitor_stats_index);
+DEFINE_PER_CPU(int ,  monitor_stats_index) = 0;
 EXPORT_PER_CPU_SYMBOL(monitor_stats_index);
-DEFINE_PER_CPU(int , monitor_stats_start);
+DEFINE_PER_CPU(int ,  monitor_stats_start) = 0;
 EXPORT_PER_CPU_SYMBOL(monitor_stats_start);
 #endif
+
+//---------------------------------------
+
+
 
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
@@ -2800,15 +2781,43 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 
 // Pietro
 #ifdef MONITOR_ON
-inline void sample_values(){
+inline void sample_values(void){	
+
+	unsigned long int cycles, instructions;
+	struct monitor_stats_data * tmp;
+
+	// enable ARM registers for reading
+	asm volatile ("MCR p15, 0, %0, c9, c12, 0\t\n" :: "r"(0x00000001));   //program_pmcr
+	asm volatile ("MCR p15, 0, %0, c9, c12, 1\t\n" :: "r"(0x8000000f));   //enable_all_counter
+	asm volatile ("MCR p15, 0, %0, c9, c13, 1\t\n" :: "r"(0x00000008));   //select_event
+	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (cycles));
+	asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (instructions));
+
+	// save data into buffer "line"
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cpu 		= smp_processor_id();
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].j 		= jiffies;
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cycles 		= cycles; //to be changed later with the value read from registers
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].instructions 	= instructions; 
+
+	//check if the buffer is full (swap if it is)
+	if(__get_cpu_var ( monitor_stats_index ) == 0  ) { // when the index is 0 then the buffer is full
+		#ifdef DEBUG_ON
+		printk(KERN_ALERT "PIETRO ALERT: monitor_stats_reader.c : CPU %u - buffer full with monitor_stats_start = %u!! and idx = %u",
+						__get_cpu_var(monitor_stats_data)[ __get_cpu_var(monitor_stats_index) +1 ].cpu
+							, __get_cpu_var(monitor_stats_start) ,__get_cpu_var(monitor_stats_index));
+		#endif
+		tmp 					= __get_cpu_var(monitor_stats_data);
+		__get_cpu_var(monitor_stats_data) 	= __get_cpu_var(monitor_stats_data2);
+		__get_cpu_var(monitor_stats_data2) 	= tmp;
+		__get_cpu_var(monitor_stats_index) 	= MONITOR_EXPORT_LENGTH;
+		__get_cpu_var(monitor_stats_start)++;
+	}
+
+	// decrease buffer index
+	__get_cpu_var(monitor_stats_index)-- ;
 
 }
 #endif
-
-
-
-
-
 
 /*
  * This function gets called by the timer code, with HZ frequency.
@@ -2824,7 +2833,9 @@ void scheduler_tick(void)
 
 	// Pietro 
 	#ifdef MONITOR_ON
-	sample_values();
+	if ( __get_cpu_var(monitor_stats_start) > 0){ // Pietro. note: this is set to 1 when the monitor driver is opened and set to 0 when closed
+		sample_values();
+	}
 	#endif
 
 	raw_spin_lock(&rq->lock);
