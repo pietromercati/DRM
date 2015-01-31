@@ -105,6 +105,13 @@ struct monitor_stats_data {
                 unsigned long int j; //jiffies
                 unsigned long int cycles;
                 unsigned long int instructions;
+		unsigned int temp ;
+                unsigned int power ;
+                unsigned int pid ;
+                unsigned int volt ;
+                unsigned int freq ;
+                unsigned int fan ;  //fan speed
+		unsigned int test ;
 };
 
 DEFINE_PER_CPU(struct monitor_stats_data *, monitor_stats_data);
@@ -115,6 +122,23 @@ DEFINE_PER_CPU(int ,  monitor_stats_index) = 0;
 EXPORT_PER_CPU_SYMBOL(monitor_stats_index);
 DEFINE_PER_CPU(int ,  monitor_stats_start) = 0;
 EXPORT_PER_CPU_SYMBOL(monitor_stats_start);
+
+
+DEFINE_PER_CPU(unsigned int , temp_core_monitor);
+EXPORT_PER_CPU_SYMBOL(temp_core_monitor);
+DEFINE_PER_CPU(unsigned int , power_core_monitor);
+EXPORT_PER_CPU_SYMBOL(power_core_monitor);
+DEFINE_PER_CPU(unsigned int , current_sched_pid); // per_cpu variable that stores the current scheduled pid. it is updated inside scheduler_tick()
+EXPORT_PER_CPU_SYMBOL(current_sched_pid);
+DEFINE_PER_CPU(unsigned int , volt_core_monitor);
+EXPORT_PER_CPU_SYMBOL(volt_core_monitor);
+DEFINE_PER_CPU(unsigned int , freq_core_monitor);
+EXPORT_PER_CPU_SYMBOL(freq_core_monitor);
+DEFINE_PER_CPU(unsigned int , fan_monitor);
+EXPORT_PER_CPU_SYMBOL(fan_monitor);
+DEFINE_PER_CPU(unsigned int , test_var_monitor);
+EXPORT_PER_CPU_SYMBOL(test_var_monitor);
+
 #endif
 
 //---------------------------------------
@@ -2790,14 +2814,22 @@ inline void sample_values(void){
 	asm volatile ("MCR p15, 0, %0, c9, c12, 0\t\n" :: "r"(0x00000001));   //program_pmcr
 	asm volatile ("MCR p15, 0, %0, c9, c12, 1\t\n" :: "r"(0x8000000f));   //enable_all_counter
 	asm volatile ("MCR p15, 0, %0, c9, c13, 1\t\n" :: "r"(0x00000008));   //select_event
-	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (cycles));
-	asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (instructions));
+	asm volatile ("mrc p15, 0, %0, c9, c13, 0" : "=r" (cycles));
+	asm volatile ("mrc p15, 0, %0, c9, c13, 2" : "=r" (instructions));
+
 
 	// save data into buffer "line"
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cpu 		= smp_processor_id();
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].j 		= jiffies;
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cycles 		= cycles; //to be changed later with the value read from registers
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].instructions 	= instructions; 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].temp 		= __get_cpu_var(temp_core_monitor); 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].power 		= __get_cpu_var(power_core_monitor); 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].pid 		= __get_cpu_var(current_sched_pid); 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].volt 		= __get_cpu_var(volt_core_monitor); 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].freq 		= __get_cpu_var(freq_core_monitor); 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].fan 		= __get_cpu_var(fan_monitor); 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].test 		= __get_cpu_var(test_var_monitor); 
 
 	//check if the buffer is full (swap if it is)
 	if(__get_cpu_var ( monitor_stats_index ) == 0  ) { // when the index is 0 then the buffer is full
@@ -2831,13 +2863,21 @@ void scheduler_tick(void)
 
 	sched_clock_tick();
 
-	// Pietro 
+	// Pietro ------------ 
+
+	//get the current pid
+	__get_cpu_var(current_sched_pid) = curr -> pid ; 
+	
+	// test variable
+	__get_cpu_var(test_var_monitor) = curr -> prio ; 
+
 	#ifdef MONITOR_ON
 	if ( __get_cpu_var(monitor_stats_start) > 0){ // Pietro. note: this is set to 1 when the monitor driver is opened and set to 0 when closed
 		sample_values();
 	}
 	#endif
 
+	//--------------------
 	raw_spin_lock(&rq->lock);
 	update_rq_clock(rq);
 	update_cpu_load_active(rq);

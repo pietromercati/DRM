@@ -60,6 +60,19 @@
 #define MONITOR_EXPORT_PAGE 6	//Number of pages allocated for each buffer
 #define MONITOR_EXPORT_LENGTH 1024	//Number of enries of kind "monitor_stats_data" inside the allocated buffer
 
+struct monitor_stats_data {
+		unsigned int cpu;
+		unsigned long int j; //jiffies
+		unsigned long int cycles;
+		unsigned long int instructions;
+		unsigned int temp ;
+                unsigned int power ;
+                unsigned int pid ;
+                unsigned int volt ;
+                unsigned int freq ;
+		unsigned int fan ;  //fan speed
+		unsigned int test ;
+};
 
 // to be defined in the kernel source code ( e.g. in core.c )
 DECLARE_PER_CPU(struct monitor_stats_data *, monitor_stats_data);  // address of the buffer #1: to be declared in the monitor_stats_module as well
@@ -68,12 +81,7 @@ DECLARE_PER_CPU(int , monitor_stats_index); //index inside of the stats buffer
 DECLARE_PER_CPU(int , monitor_stats_start); //incremented each time a buffer is filled. useful in conditions.
 
 
-struct monitor_stats_data {
-		unsigned int cpu;
-		unsigned long int j; //jiffies
-		unsigned long int cycles;
-		unsigned long int instructions;
-};
+
 
 static int selected_cpu = 0;
 

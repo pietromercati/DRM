@@ -63,6 +63,13 @@ struct monitor_stats_data {
                 unsigned long int j; 	//jiffies
                 unsigned long int cycles;
                 unsigned long int instructions;
+		unsigned int temp ;
+		unsigned int power ;
+		unsigned int pid ;
+		unsigned int volt ;
+		unsigned int freq ;
+                unsigned int fan ;  //fan speed
+		unsigned int test ;
 };
 
 // ---------------- MAIN FUNCTION ----------------- //
@@ -80,8 +87,6 @@ int main(int argc, char ** argv){
 	char file_name[60];
 	FILE *fp;
 	int i;
-
-	// remove previous files (this is required as files are opened with the append option)
 	system("rm /data/PIETRO/MONITOR_STATS/monitor_stats_data_cpu_*");
 
 
@@ -99,7 +104,7 @@ int main(int argc, char ** argv){
 	// save the current status of ready flags	
 	for (cpu = 0 ; cpu < NUM_CPU ; cpu++){
 		ioctl(fd, READY, &ready[cpu]);
-		ready_old[cpu] = ready[cpu]; 
+		ready_old[cpu] = 1 ; 
 	}
 		
 	// Main Loop
@@ -151,12 +156,20 @@ int main(int argc, char ** argv){
 				for(i = MONITOR_EXPORT_LENGTH-1 ; i>=0 ; i--){
                         		fprintf(
 						fp,
-                                        	"%lu\t%lu\t%lu\t%lu\n",
+					       //1    2    3    4    5    6    7    8    9    10
+                                        	"%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\n",
                                                 log_struct[i].cpu,
                                                 log_struct[i].j,
                                                 log_struct[i].cycles,
-                                                log_struct[i].instructions
-						);
+                                                log_struct[i].instructions,
+						log_struct[i].temp,
+						log_struct[i].power,
+						log_struct[i].pid,
+						log_struct[i].volt,
+						log_struct[i].freq,
+						log_struct[i].fan,
+						log_struct[i].test
+								);
 				}
 				
 				// close file
