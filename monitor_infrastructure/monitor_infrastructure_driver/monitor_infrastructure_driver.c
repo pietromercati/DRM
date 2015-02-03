@@ -54,6 +54,8 @@
 #define READY 		2
 #define S_READY 	3
 
+
+#define EXYNOS_TMU_COUNT 5 // this has to be the same as in exynos_thermal.c and core.c
 /*
 *	Defines the dimention of the buffer to allocate for collecting the MONITOR statistics. 	
 */
@@ -65,12 +67,14 @@ struct monitor_stats_data {
 		unsigned long int j; //jiffies
 		unsigned long int cycles;
 		unsigned long int instructions;
-		unsigned int temp ;
+		unsigned int temp[EXYNOS_TMU_COUNT] ;
                 unsigned int power ;
                 unsigned int pid ;
                 unsigned int volt ;
                 unsigned int freq ;
 		unsigned int fan ;  //fan speed
+                int task_prio;
+                int task_static_prio;
 		unsigned int test ;
 };
 
@@ -79,9 +83,6 @@ DECLARE_PER_CPU(struct monitor_stats_data *, monitor_stats_data);  // address of
 DECLARE_PER_CPU(struct monitor_stats_data *, monitor_stats_data2);  // address of the buffer #2: to be declared in the monitor_stats_module as well
 DECLARE_PER_CPU(int , monitor_stats_index); //index inside of the stats buffer
 DECLARE_PER_CPU(int , monitor_stats_start); //incremented each time a buffer is filled. useful in conditions.
-
-
-
 
 static int selected_cpu = 0;
 
@@ -206,6 +207,7 @@ static long monitor_ioctl(struct file *file,
 	return retval;
 
 }
+
 
 /*
 READY : this one has to be used as a condition by the userspace program

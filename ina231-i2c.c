@@ -18,7 +18,6 @@
 #define MONITOR_ON
 DECLARE_PER_CPU(unsigned int , power_core_monitor);
 
-
 //[*]--------------------------------------------------------------------------------------------------[*]
 #include "ina231-misc.h"
 #include "ina231-sysfs.h"

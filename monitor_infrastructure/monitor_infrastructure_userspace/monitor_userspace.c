@@ -58,17 +58,21 @@
 #define READY 		2
 #define S_READY		3
 
+#define EXYNOS_TMU_COUNT 5 // this has to be the same as in exynos_thermal.c and core.c
+
 struct monitor_stats_data {
                 unsigned int cpu;
                 unsigned long int j; 	//jiffies
                 unsigned long int cycles;
                 unsigned long int instructions;
-		unsigned int temp ;
+                unsigned int temp[EXYNOS_TMU_COUNT] ;
 		unsigned int power ;
 		unsigned int pid ;
 		unsigned int volt ;
 		unsigned int freq ;
                 unsigned int fan ;  //fan speed
+               	int task_prio;
+                int task_static_prio;
 		unsigned int test ;
 };
 
@@ -156,19 +160,25 @@ int main(int argc, char ** argv){
 				for(i = MONITOR_EXPORT_LENGTH-1 ; i>=0 ; i--){
                         		fprintf(
 						fp,
-					       //1    2    3    4    5    6    7    8    9    10
-                                        	"%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\n",
-                                                log_struct[i].cpu,
-                                                log_struct[i].j,
-                                                log_struct[i].cycles,
-                                                log_struct[i].instructions,
-						log_struct[i].temp,
-						log_struct[i].power,
-						log_struct[i].pid,
-						log_struct[i].volt,
-						log_struct[i].freq,
-						log_struct[i].fan,
-						log_struct[i].test
+					       //1    2    3    4    5    6    7    8    9    10   11  12   13   14   15   16  17 
+                                        	"%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%d\t%d\t%lu\n",
+                                                log_struct[i].cpu,		//1
+                                                log_struct[i].j,		//2
+                                                log_struct[i].cycles,		//3
+                                                log_struct[i].instructions,	//4
+						log_struct[i].temp[0],		//5
+						log_struct[i].temp[1],		//6
+						log_struct[i].temp[2],		//7
+						log_struct[i].temp[3],		//8
+						log_struct[i].temp[4],		//9
+						log_struct[i].power,		//10
+						log_struct[i].pid,		//11
+						log_struct[i].volt,		//12
+						log_struct[i].freq,		//13
+						log_struct[i].fan,		//14
+						log_struct[i].task_prio,	//15
+						log_struct[i].task_static_prio,	//16
+						log_struct[i].test		//17
 								);
 				}
 				
