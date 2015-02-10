@@ -68,6 +68,7 @@ struct monitor_stats_data {
 		unsigned long int cycles;
 		unsigned long int instructions;
 		unsigned int temp[EXYNOS_TMU_COUNT] ;
+		unsigned int power_id;
                 unsigned int power ;
                 unsigned int pid ;
                 unsigned int volt ;

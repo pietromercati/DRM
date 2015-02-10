@@ -17,12 +17,14 @@
 // Pietro
 #define MONITOR_ON
 DECLARE_PER_CPU(unsigned int , power_core_monitor);
+DECLARE_PER_CPU(unsigned int , power_core_id);
 
 //[*]--------------------------------------------------------------------------------------------------[*]
 #include "ina231-misc.h"
 #include "ina231-sysfs.h"
 
 //#define DEBUG_INA231
+
 //[*]--------------------------------------------------------------------------------------------------[*]
 //
 // function prototype
@@ -141,8 +143,23 @@ static 	void 	ina231_work		(struct work_struct *work)
 	        
 	// Pietro 
 	#ifdef MONITOR_ON
-	__get_cpu_var(power_core_monitor) = sensor->cur_uW;
+	switch (sensor->pd->name[7]){
+		case 'a' :
+			__get_cpu_var(power_core_id)	= 0;
+			break;
+		case 'k' :
+			__get_cpu_var(power_core_id)	= 1;
+			break;
+		case 'g' :
+			__get_cpu_var(power_core_id)	= 2;
+			break;
+		case 'm' :
+			__get_cpu_var(power_core_id)	= 3;
+			break;
+	}
+	__get_cpu_var(power_core_monitor) 	= sensor->cur_uW;
 	#endif 
+
 
         if((sensor->cur_uV > sensor->max_uV) || (sensor->cur_uA > sensor->cur_uA))  {
             sensor->max_uV = sensor->cur_uV;    sensor->max_uA = sensor->cur_uA;    sensor->max_uW = sensor->cur_uW;

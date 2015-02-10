@@ -92,6 +92,7 @@
 
 // Pietro -----------------------------------
 // Macros definitions
+//#define VARDROID
 #define MONITOR_ON
 #define MONITOR_EXPORT_LENGTH 1024 //Number of enries of kind "monitor_stats_data" inside the allocated buffer. It has to be same as in the driver and in the userspace program
 #define DEBUG_ON
@@ -106,6 +107,7 @@ struct monitor_stats_data {
                 unsigned long int cycles;
                 unsigned long int instructions;
 		unsigned int temp[EXYNOS_TMU_COUNT] ;
+		unsigned int power_id;
                 unsigned int power ;
                 unsigned int pid ;
                 unsigned int volt ;
@@ -129,6 +131,8 @@ EXPORT_PER_CPU_SYMBOL(monitor_stats_start);
 unsigned int temp_monitor[EXYNOS_TMU_COUNT];
 EXPORT_SYMBOL(temp_monitor);
 
+DEFINE_PER_CPU(unsigned int , power_core_id);
+EXPORT_PER_CPU_SYMBOL(power_core_id);
 DEFINE_PER_CPU(unsigned int , power_core_monitor);
 EXPORT_PER_CPU_SYMBOL(power_core_monitor);
 DEFINE_PER_CPU(unsigned int , current_sched_pid); // per_cpu variable that stores the current scheduled pid. it is updated inside scheduler_tick()
@@ -145,11 +149,12 @@ DEFINE_PER_CPU(int , task_static_prio_monitor);
 EXPORT_PER_CPU_SYMBOL(task_static_prio_monitor);
 DEFINE_PER_CPU(unsigned int , test_var_monitor);
 EXPORT_PER_CPU_SYMBOL(test_var_monitor);
-
-
-
 #endif
 
+#ifdef VARDROID
+int vardroid_active = 1;
+EXPORT_SYMBOL(vardroid_active);
+#endif
 //---------------------------------------
 
 
@@ -2812,6 +2817,27 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 	return ns;
 }
 
+#ifdef VARDROID
+inline void vardroid_bubble(int select){
+	int i = 0;
+	int a;
+	switch (select){
+		case 0 : // bubble 1 : do nothing 
+			break;
+		case 1 : // bubble 2 :
+			for ( i = 0 ; i < 10 ; i++ ){
+				a = i + 1;
+			}
+			break;
+		case 2 :
+			break;
+
+		//etc
+	} // end of switch
+}
+#endif //VARDROID
+
+
 // Pietro
 #ifdef MONITOR_ON
 inline void sample_values(void){	
@@ -2834,7 +2860,8 @@ inline void sample_values(void){
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].instructions 	= instructions; 
 	for ( i = 0 ; i < EXYNOS_TMU_COUNT ; i++ ){
 		__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].temp[i] 	= temp_monitor[i] ; 
-	}
+	}	
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].power_id	 	= __get_cpu_var(power_core_id); 
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].power 		= __get_cpu_var(power_core_monitor); 
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].pid 		= __get_cpu_var(current_sched_pid); 
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].volt 		= __get_cpu_var(volt_core_monitor); 
@@ -2879,6 +2906,14 @@ void scheduler_tick(void)
 	sched_clock_tick();
 
 	// Pietro ------------ 
+	#ifdef VARDROID
+	if (vardroid_active == 1){
+		vardroid_bubble(1);
+	}
+	#endif //VARDROID
+
+
+
 
 	#ifdef MONITOR_ON
 	//get the current pid

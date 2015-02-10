@@ -66,6 +66,7 @@ struct monitor_stats_data {
                 unsigned long int cycles;
                 unsigned long int instructions;
                 unsigned int temp[EXYNOS_TMU_COUNT] ;
+		unsigned int power_id;
 		unsigned int power ;
 		unsigned int pid ;
 		unsigned int volt ;
@@ -160,8 +161,8 @@ int main(int argc, char ** argv){
 				for(i = MONITOR_EXPORT_LENGTH-1 ; i>=0 ; i--){
                         		fprintf(
 						fp,
-					       //1    2    3    4    5    6    7    8    9    10   11  12   13   14   15   16  17 
-                                        	"%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%d\t%d\t%lu\n",
+					       //1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16  17  18
+                                        	"%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\t%d\t%d\t%lu\n",
                                                 log_struct[i].cpu,		//1
                                                 log_struct[i].j,		//2
                                                 log_struct[i].cycles,		//3
@@ -171,14 +172,15 @@ int main(int argc, char ** argv){
 						log_struct[i].temp[2],		//7
 						log_struct[i].temp[3],		//8
 						log_struct[i].temp[4],		//9
-						log_struct[i].power,		//10
-						log_struct[i].pid,		//11
-						log_struct[i].volt,		//12
-						log_struct[i].freq,		//13
-						log_struct[i].fan,		//14
-						log_struct[i].task_prio,	//15
-						log_struct[i].task_static_prio,	//16
-						log_struct[i].test		//17
+						log_struct[i].power_id,		//10
+						log_struct[i].power,		//11
+						log_struct[i].pid,		//12
+						log_struct[i].volt,		//13
+						log_struct[i].freq,		//14
+						log_struct[i].fan,		//15
+						log_struct[i].task_prio,	//16
+						log_struct[i].task_static_prio,	//17
+						log_struct[i].test		//18
 								);
 				}
 				
