@@ -1,3 +1,4 @@
+close all
 
 pre_process_data
 
@@ -9,7 +10,7 @@ min_jiffy = min(monitor_stats_data_cpu(1,2,monitored_cpus));
 max_jiffy = max(max(monitor_stats_data_cpu(:,2,monitored_cpus)));
 sizeP = max_jiffy - min_jiffy;
 
-jiffy_axes = min_jiffy : 1 : max_jiffy ;
+jiffy_axes = min_jiffy+1 : 1 : max_jiffy ;
 power = zeros(num_P_sensor, sizeP);
 
 for k = 1:monitored_cpus

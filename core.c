@@ -92,15 +92,16 @@
 
 // Pietro -----------------------------------
 // Macros definitions
-//#define VARDROID
-#define MONITOR_ON
+#define VARDROID     		// activates stuff related to the VarDroid project
+#define MONITOR_ON		// activates the monitor 
+#define REL_SENS		// activates the reliability sensors
 #define MONITOR_EXPORT_LENGTH 1024 //Number of enries of kind "monitor_stats_data" inside the allocated buffer. It has to be same as in the driver and in the userspace program
-#define DEBUG_ON
-#define EXYNOS_TMU_COUNT                        5 // this should be the same as in exynos_thermal.c
+#define DEBUG_ON		// sctivates debug functionalities (e.g. printk)
+#define EXYNOS_TMU_COUNT      5 // this should be the same as in exynos_thermal.c
 //end of Macros definitions
 
 // Variables definitions
-#ifdef MONITOR_ON
+#ifdef MONITOR_ON   // variables for monitor
 struct monitor_stats_data {
                 unsigned int cpu;
                 unsigned long int j; //jiffies
@@ -149,15 +150,29 @@ DEFINE_PER_CPU(int , task_static_prio_monitor);
 EXPORT_PER_CPU_SYMBOL(task_static_prio_monitor);
 DEFINE_PER_CPU(unsigned int , test_var_monitor);
 EXPORT_PER_CPU_SYMBOL(test_var_monitor);
-#endif
+#endif //MONITOR_ON
 
-#ifdef VARDROID
-int vardroid_active = 1;
+#ifdef VARDROID // variables for vardroid
+int vardroid_active = 1; // this variable switches on/off the bubbles
 EXPORT_SYMBOL(vardroid_active);
-#endif
+int vardroid_select_bubble_global = 1;
+EXPORT_SYMBOL(vardroid_select_bubble_global);
+int vardroid_bubble_length = 100;
+EXPORT_SYMBOL(vardroid_bubble_length);
+
+unsigned long int cycles_overhead;
+unsigned long int instructions_overhead;
+
+#endif //VARDROID
+
+#ifdef REL_SENS
+unsigned long int temp_relsens[20]; // define a vector long enough so that it can be used for different platforms
+EXPORT_SYMBOL(temp_relsens);
+unsigned long int freq_relsens[20];   //here I define frequencies, they are "converted" into voltages in the relsens driver
+EXPORT_SYMBOL(freq_relsens);
+#endif //REL_SENS
+
 //---------------------------------------
-
-
 
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
@@ -2820,20 +2835,56 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 #ifdef VARDROID
 inline void vardroid_bubble(int select){
 	int i = 0;
-	int a;
+	unsigned long int c1, c2;
+	unsigned long int i1, i2;
+
+	int num_loops;
+
+	// we need to record the overhead associated to the bubble itself to subtract from the monitor sampling
+	asm volatile ("mrc p15, 0, %0, c9, c13, 0" : "=r" (c1));
+	asm volatile ("mrc p15, 0, %0, c9, c13, 2" : "=r" (i1));
+	
+	num_loops = vardroid_bubble_length;
+
 	switch (select){
-		case 0 : // bubble 1 : do nothing 
+		case 0 : 				// bubble 0 : empty bubble (do nothing)
+		
 			break;
-		case 1 : // bubble 2 :
-			for ( i = 0 ; i < 10 ; i++ ){
-				a = i + 1;
+		case 1 : 				// bubble 1 : series of NOP 
+			for (i = 0 ; i < num_loops ; i ++ ){
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
+			asm volatile ("mov r0, r0");
 			}
 			break;
-		case 2 :
+		case 2 :				// bubble 2 : 
 			break;
 
 		//etc
 	} // end of switch
+
+	// compute cycles and intructions differences
+	asm volatile ("mrc p15, 0, %0, c9, c13, 0" : "=r" (c2));
+	asm volatile ("mrc p15, 0, %0, c9, c13, 2" : "=r" (i2));
+	cycles_overhead 	= c2 - c1;
+	instructions_overhead 	= i2 - i1;
 }
 #endif //VARDROID
 
@@ -2856,11 +2907,16 @@ inline void sample_values(void){
 	// save data into buffer "line"
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cpu 		= smp_processor_id();
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].j 		= jiffies;
-	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cycles 		= cycles; //to be changed later with the value read from registers
-	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].instructions 	= instructions; 
+	#ifdef VARDROID // note: if vardroid is working, we need to subtract the cycle and istruction overhead from the monitor reading
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cycles 		= cycles - cycles_overhead; 
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].instructions 	= instructions - instructions_overhead; 
+	#else
+	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].cycles            = cycles; 
+        __get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].instructions      = instructions;
+	#endif //VARDROID
 	for ( i = 0 ; i < EXYNOS_TMU_COUNT ; i++ ){
 		__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].temp[i] 	= temp_monitor[i] ; 
-	}	
+	}
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].power_id	 	= __get_cpu_var(power_core_id); 
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].power 		= __get_cpu_var(power_core_monitor); 
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].pid 		= __get_cpu_var(current_sched_pid); 
@@ -2871,9 +2927,7 @@ inline void sample_values(void){
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].task_static_prio 	= __get_cpu_var(task_static_prio_monitor); 
 	__get_cpu_var(monitor_stats_data)[__get_cpu_var(monitor_stats_index)].test 		= __get_cpu_var(test_var_monitor); 
 
-
-
-	//check if the buffer is full (swap if it is)
+	// check if the buffer is full (swap if it is)
 	if(__get_cpu_var ( monitor_stats_index ) == 0  ) { // when the index is 0 then the buffer is full
 		#ifdef DEBUG_ON
 		printk(KERN_ALERT "PIETRO ALERT: monitor_stats_reader.c : CPU %u - buffer full with monitor_stats_start = %u!! and idx = %u",
@@ -2891,7 +2945,7 @@ inline void sample_values(void){
 	__get_cpu_var(monitor_stats_index)-- ;
 
 }
-#endif
+#endif // MONITOR_ON
 
 /*
  * This function gets called by the timer code, with HZ frequency.
@@ -2908,7 +2962,7 @@ void scheduler_tick(void)
 	// Pietro ------------ 
 	#ifdef VARDROID
 	if (vardroid_active == 1){
-		vardroid_bubble(1);
+		vardroid_bubble(vardroid_select_bubble_global);
 	}
 	#endif //VARDROID
 
